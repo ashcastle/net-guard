@@ -5,7 +5,7 @@ struct NetGuardCLI: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "netguard",
         abstract: "🛡️ NetGuard: Automated macOS Network Security & Eavesdropping Prevention Tool",
-        version: "1.0.3",
+        version: "1.0.4",
         subcommands: [
             ScanCommand.self,
             MenuCommand.self,
@@ -105,19 +105,28 @@ struct ScanCommand: ParsableCommand {
     }
 }
 
-// MARK: - Menu Bar Command (Header Bar)
+// MARK: - Menu Bar Command
 struct MenuCommand: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "menu",
-        abstract: "Launch the macOS status bar (menu bar) app for real-time visual monitoring."
+        abstract: "Launch the macOS status bar (menu bar) app in background or foreground."
     )
 
+    @Flag(name: .shortAndLong, help: "Run in foreground terminal instead of background daemon.")
+    var foreground: Bool = false
+
     func run() throws {
-        print("🛡️ NetGuard Menu Bar App is now running in your macOS Top Bar.")
-        print("   Look at the top-right menu bar for the 🛡️ Shield icon.")
-        print("   Press Ctrl+C in this terminal to stop.")
-        let controller = MenuBarController()
-        controller.start()
+        if foreground {
+            print("🛡️ NetGuard Menu Bar running in foreground (Ctrl+C to quit)...")
+            let controller = MenuBarController()
+            controller.start()
+        } else {
+            let result = DaemonManager.enableDaemon()
+            print(result.message)
+            print("🛡️ NetGuard Menu Bar is now running in your macOS Top Bar (Background).")
+            print("   Look at the top-right menu bar for the 🛡️ Shield icon.")
+            print("   To turn off: run 'netg daemon off'\n")
+        }
     }
 }
 
@@ -125,7 +134,7 @@ struct MenuCommand: ParsableCommand {
 struct DaemonCommand: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "daemon",
-        abstract: "Control or run the NetGuard background daemon service.",
+        abstract: "Control or run the NetGuard background daemon service with top menu bar integration.",
         subcommands: [
             DaemonOn.self,
             DaemonOff.self,
@@ -138,19 +147,20 @@ struct DaemonCommand: ParsableCommand {
     struct DaemonOn: ParsableCommand {
         static var configuration = CommandConfiguration(
             commandName: "on",
-            abstract: "Register and start the NetGuard daemon via macOS launchd."
+            abstract: "Register and start NetGuard background daemon and menu bar icon."
         )
 
         func run() throws {
             let result = DaemonManager.enableDaemon()
             print(result.message)
+            print("🛡️ NetGuard daemon is active in the background. (Menu bar icon enabled)\n")
         }
     }
 
     struct DaemonOff: ParsableCommand {
         static var configuration = CommandConfiguration(
             commandName: "off",
-            abstract: "Stop and unregister the NetGuard daemon."
+            abstract: "Stop and unregister NetGuard background daemon."
         )
 
         func run() throws {
@@ -162,23 +172,13 @@ struct DaemonCommand: ParsableCommand {
     struct DaemonRun: ParsableCommand {
         static var configuration = CommandConfiguration(
             commandName: "run",
-            abstract: "Execute the daemon event loop (invoked by launchd)."
+            abstract: "Execute the daemon event loop with menu bar (invoked by launchd)."
         )
 
         func run() throws {
-            let config = ConfigManager.shared.load()
-            let scanner = Scanner(config: config)
-            let handler = ProtectionHandler(config: config)
-
-            let monitor = NetworkMonitor { _ in
-                Task {
-                    let report = await scanner.runAudit()
-                    handler.handle(report: report)
-                }
-            }
-
-            monitor.start()
-            dispatchMain()
+            // Launch MenuBarController which handles both menu bar UI and network monitoring
+            let controller = MenuBarController()
+            controller.start()
         }
     }
 
@@ -216,8 +216,6 @@ struct WatchCommand: ParsableCommand {
         }
 
         monitor.start()
-
-        // Keep loop running
         dispatchMain()
     }
 }

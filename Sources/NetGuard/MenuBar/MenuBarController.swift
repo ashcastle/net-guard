@@ -26,19 +26,13 @@ public final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDel
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
-        // Setup Status Item in macOS Menu Bar
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // Setup Status Item in macOS Menu Bar (Icon-only mode)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         
         if let button = statusItem?.button {
-            if #available(macOS 11.0, *) {
-                let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-                let img = NSImage(systemSymbolName: "shield.lefthalf.filled", accessibilityDescription: "NetGuard")?.withSymbolConfiguration(config)
-                img?.isTemplate = true
-                button.image = img
-                button.imagePosition = .imageLeading
-            }
-            button.title = " NetGuard"
+            button.title = "" // No text, clean icon only
             button.toolTip = "NetGuard: Network Security Monitor"
+            updateStatusIcon(isSafe: true, isChecking: true)
         }
 
         menu.delegate = self
@@ -63,7 +57,7 @@ public final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDel
     private func performScan() async {
         guard !isScanning else { return }
         isScanning = true
-        updateStatusButton(title: " NetGuard (Scanning...)", isSafe: nil, isChecking: true)
+        updateStatusIcon(isSafe: nil, isChecking: true)
 
         let report = await scanner.runAudit()
         self.latestReport = report
@@ -72,33 +66,34 @@ public final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDel
 
         if report.isSafe {
             let name = report.network.ssid ?? report.network.interfaceName
-            updateStatusButton(title: " NetGuard (\(name))", isSafe: true, isChecking: false)
+            updateStatusIcon(isSafe: true, isChecking: false, toolTip: "NetGuard: Protected (\(name))")
         } else {
-            updateStatusButton(title: " NetGuard (⚠️ \(report.overallStatus.rawValue))", isSafe: false, isChecking: false)
+            updateStatusIcon(isSafe: false, isChecking: false, toolTip: "NetGuard: ⚠️ \(report.overallStatus.rawValue) Threat Detected!")
         }
 
         rebuildMenu()
     }
 
-    private func updateStatusButton(title: String, isSafe: Bool?, isChecking: Bool) {
+    private func updateStatusIcon(isSafe: Bool?, isChecking: Bool, toolTip: String = "NetGuard") {
         DispatchQueue.main.async {
             guard let button = self.statusItem?.button else { return }
-            button.title = title
+            button.title = "" // Keep title empty for clean icon-only UI
+            button.toolTip = toolTip
 
             if #available(macOS 11.0, *) {
                 let symbolName: String
                 if isChecking {
                     symbolName = "antenna.radiowaves.left.and.right"
                 } else if isSafe == true {
-                    symbolName = "checkmark.shield.fill"
+                    symbolName = "shield.fill"
                 } else if isSafe == false {
                     symbolName = "exclamationmark.shield.fill"
                 } else {
-                    symbolName = "shield.lefthalf.filled"
+                    symbolName = "shield"
                 }
 
-                let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-                let img = NSImage(systemSymbolName: symbolName, accessibilityDescription: "NetGuard")?.withSymbolConfiguration(config)
+                let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .medium)
+                let img = NSImage(systemSymbolName: symbolName, accessibilityDescription: toolTip)?.withSymbolConfiguration(config)
                 img?.isTemplate = (isSafe != false)
                 button.image = img
             }
@@ -112,16 +107,16 @@ public final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDel
     private func rebuildMenu() {
         menu.removeAllItems()
 
-        // 1. Header & Title
+        // 1. Header & Status Title
         let headerItem = NSMenuItem(title: "NetGuard Network Security", action: nil, keyEquivalent: "")
         headerItem.attributedTitle = NSAttributedString(
-            string: "🛡️ NetGuard Monitor",
+            string: "🛡️ NetGuard Network Monitor",
             attributes: [.font: NSFont.boldSystemFont(ofSize: 13)]
         )
         menu.addItem(headerItem)
         menu.addItem(NSMenuItem.separator())
 
-        // 2. Active Network Details
+        // 2. Active Network Information
         if let report = latestReport {
             let net = report.network
             let networkTitle = net.isWireless ? "📶 Wi-Fi: \(net.ssid ?? "Unknown")" : "📡 Interface: \(net.interfaceName)"
@@ -143,7 +138,7 @@ public final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDel
 
             menu.addItem(NSMenuItem.separator())
 
-            // 3. Security Audit Findings Submenu
+            // 3. Security Findings Submenu
             let findingsMenu = NSMenu()
             for finding in report.findings {
                 let icon = finding.passed ? "✅" : (finding.severity == .critical || finding.severity == .high ? "🚨" : "⚠️")
@@ -176,14 +171,7 @@ public final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDel
         scanItem.target = self
         menu.addItem(scanItem)
 
-        // 5. Daemon Toggle
-        let isDaemonRunning = DaemonManager.isRunning()
-        let daemonTitle = isDaemonRunning ? "⚙️ Background Daemon: Active (Turn Off)" : "⚙️ Background Daemon: Inactive (Turn On)"
-        let daemonItem = NSMenuItem(title: daemonTitle, action: #selector(toggleDaemonClicked), keyEquivalent: "d")
-        daemonItem.target = self
-        menu.addItem(daemonItem)
-
-        // 6. Secure DNS Toggle
+        // 5. Secure DNS Toggle
         let dnsItem = NSMenuItem(
             title: config.action.autoSecureDNS ? "🔒 Secure DNS (DoH): Enabled" : "🔓 Secure DNS: Disabled (Enable)",
             action: #selector(toggleSecureDNSClicked),
@@ -194,12 +182,12 @@ public final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDel
 
         menu.addItem(NSMenuItem.separator())
 
-        // 7. Config & Quit
+        // 6. Open Config & Quit
         let openConfigItem = NSMenuItem(title: "📄 Open Config Directory", action: #selector(openConfigClicked), keyEquivalent: "c")
         openConfigItem.target = self
         menu.addItem(openConfigItem)
 
-        let quitItem = NSMenuItem(title: "Quit NetGuard", action: #selector(quitClicked), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: "Quit NetGuard Menu Bar", action: #selector(quitClicked), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
     }
@@ -208,15 +196,6 @@ public final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDel
         Task { @MainActor in
             await performScan()
         }
-    }
-
-    @objc private func toggleDaemonClicked() {
-        if DaemonManager.isRunning() {
-            _ = DaemonManager.disableDaemon()
-        } else {
-            _ = DaemonManager.enableDaemon()
-        }
-        rebuildMenu()
     }
 
     @objc private func toggleSecureDNSClicked() {
