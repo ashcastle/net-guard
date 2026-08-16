@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 
-public final class MenuBarController: NSObject, NSMenuDelegate {
+public final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private let menu = NSMenu()
     private var scanner: Scanner
@@ -19,16 +19,31 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     public func start() {
-        NSApplication.shared.setActivationPolicy(.accessory)
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        app.delegate = self
+        app.run()
+    }
 
+    public func applicationDidFinishLaunching(_ notification: Notification) {
+        // Setup Status Item in macOS Menu Bar
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        
         if let button = statusItem?.button {
-            button.title = "🛡️ NetGuard"
+            if #available(macOS 11.0, *) {
+                let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+                let img = NSImage(systemSymbolName: "shield.lefthalf.filled", accessibilityDescription: "NetGuard")?.withSymbolConfiguration(config)
+                img?.isTemplate = true
+                button.image = img
+                button.imagePosition = .imageLeading
+            }
+            button.title = " NetGuard"
             button.toolTip = "NetGuard: Network Security Monitor"
         }
 
         menu.delegate = self
         statusItem?.menu = menu
+        rebuildMenu()
 
         // Start Network Monitor
         monitor = NetworkMonitor { [weak self] _ in
@@ -38,19 +53,17 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         }
         monitor?.start()
 
-        // Initial scan
+        // Trigger initial security scan
         Task { @MainActor in
             await self.performScan()
         }
-
-        NSApplication.shared.run()
     }
 
     @MainActor
     private func performScan() async {
         guard !isScanning else { return }
         isScanning = true
-        updateStatusButton(title: "🛡️📡 Checking...", toolTip: "NetGuard: Auditing network security...")
+        updateStatusButton(title: " NetGuard (Scanning...)", isSafe: nil, isChecking: true)
 
         let report = await scanner.runAudit()
         self.latestReport = report
@@ -58,19 +71,36 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         self.isScanning = false
 
         if report.isSafe {
-            updateStatusButton(title: "🛡️🟢 Safe", toolTip: "NetGuard: Network is secure (\(report.network.ssid ?? report.network.interfaceName))")
+            let name = report.network.ssid ?? report.network.interfaceName
+            updateStatusButton(title: " NetGuard (\(name))", isSafe: true, isChecking: false)
         } else {
-            updateStatusButton(title: "🛡️🚨 \(report.overallStatus.rawValue)", toolTip: "NetGuard: \(report.summaryMessage)")
+            updateStatusButton(title: " NetGuard (⚠️ \(report.overallStatus.rawValue))", isSafe: false, isChecking: false)
         }
 
         rebuildMenu()
     }
 
-    private func updateStatusButton(title: String, toolTip: String) {
+    private func updateStatusButton(title: String, isSafe: Bool?, isChecking: Bool) {
         DispatchQueue.main.async {
-            if let button = self.statusItem?.button {
-                button.title = title
-                button.toolTip = toolTip
+            guard let button = self.statusItem?.button else { return }
+            button.title = title
+
+            if #available(macOS 11.0, *) {
+                let symbolName: String
+                if isChecking {
+                    symbolName = "antenna.radiowaves.left.and.right"
+                } else if isSafe == true {
+                    symbolName = "checkmark.shield.fill"
+                } else if isSafe == false {
+                    symbolName = "exclamationmark.shield.fill"
+                } else {
+                    symbolName = "shield.lefthalf.filled"
+                }
+
+                let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+                let img = NSImage(systemSymbolName: symbolName, accessibilityDescription: "NetGuard")?.withSymbolConfiguration(config)
+                img?.isTemplate = (isSafe != false)
+                button.image = img
             }
         }
     }
@@ -82,16 +112,16 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
     private func rebuildMenu() {
         menu.removeAllItems()
 
-        // 1. Header & Status Title
+        // 1. Header & Title
         let headerItem = NSMenuItem(title: "NetGuard Network Security", action: nil, keyEquivalent: "")
         headerItem.attributedTitle = NSAttributedString(
-            string: "🛡️ NetGuard Network Monitor",
+            string: "🛡️ NetGuard Monitor",
             attributes: [.font: NSFont.boldSystemFont(ofSize: 13)]
         )
         menu.addItem(headerItem)
         menu.addItem(NSMenuItem.separator())
 
-        // 2. Active Network Information
+        // 2. Active Network Details
         if let report = latestReport {
             let net = report.network
             let networkTitle = net.isWireless ? "📶 Wi-Fi: \(net.ssid ?? "Unknown")" : "📡 Interface: \(net.interfaceName)"
@@ -113,7 +143,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
             menu.addItem(NSMenuItem.separator())
 
-            // 3. Security Findings Submenu
+            // 3. Security Audit Findings Submenu
             let findingsMenu = NSMenu()
             for finding in report.findings {
                 let icon = finding.passed ? "✅" : (finding.severity == .critical || finding.severity == .high ? "🚨" : "⚠️")
@@ -130,11 +160,11 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
                 findingsMenu.addItem(item)
             }
 
-            let statusSubmenuItem = NSMenuItem(title: report.isSafe ? "✅ Security Status: Protected" : "⚠️ Security Status: Threats Found", action: nil, keyEquivalent: "")
+            let statusSubmenuItem = NSMenuItem(title: report.isSafe ? "✅ Security Status: Protected" : "⚠️ Security Status: Threats Detected", action: nil, keyEquivalent: "")
             statusSubmenuItem.submenu = findingsMenu
             menu.addItem(statusSubmenuItem)
         } else {
-            let loadingItem = NSMenuItem(title: "Collecting Network Info...", action: nil, keyEquivalent: "")
+            let loadingItem = NSMenuItem(title: "Auditing Network Connection...", action: nil, keyEquivalent: "")
             loadingItem.isEnabled = false
             menu.addItem(loadingItem)
         }
@@ -146,7 +176,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         scanItem.target = self
         menu.addItem(scanItem)
 
-        // 5. Daemon Toggle Item
+        // 5. Daemon Toggle
         let isDaemonRunning = DaemonManager.isRunning()
         let daemonTitle = isDaemonRunning ? "⚙️ Background Daemon: Active (Turn Off)" : "⚙️ Background Daemon: Inactive (Turn On)"
         let daemonItem = NSMenuItem(title: daemonTitle, action: #selector(toggleDaemonClicked), keyEquivalent: "d")
@@ -164,7 +194,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        // 7. Open Config & Quit
+        // 7. Config & Quit
         let openConfigItem = NSMenuItem(title: "📄 Open Config Directory", action: #selector(openConfigClicked), keyEquivalent: "c")
         openConfigItem.target = self
         menu.addItem(openConfigItem)

@@ -1,11 +1,11 @@
 import Foundation
 import ArgumentParser
 
-struct NetGuardCLI: AsyncParsableCommand {
+struct NetGuardCLI: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "netguard",
         abstract: "🛡️ NetGuard: Automated macOS Network Security & Eavesdropping Prevention Tool",
-        version: "1.0.1",
+        version: "1.0.3",
         subcommands: [
             ScanCommand.self,
             MenuCommand.self,
@@ -19,7 +19,7 @@ struct NetGuardCLI: AsyncParsableCommand {
 }
 
 // MARK: - Scan Command
-struct ScanCommand: AsyncParsableCommand {
+struct ScanCommand: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "scan",
         abstract: "Perform an instant security audit on the active network connection."
@@ -28,7 +28,7 @@ struct ScanCommand: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Output results in JSON format.")
     var json: Bool = false
 
-    func run() async throws {
+    func run() throws {
         let config = ConfigManager.shared.load()
         let scanner = Scanner(config: config)
 
@@ -36,7 +36,21 @@ struct ScanCommand: AsyncParsableCommand {
             print("\n🔍 NetGuard: Auditing active network security...")
         }
 
-        let report = await scanner.runAudit()
+        let semaphore = DispatchSemaphore(value: 0)
+        var reportResult: AuditReport?
+
+        Task {
+            let report = await scanner.runAudit()
+            reportResult = report
+            semaphore.signal()
+        }
+
+        semaphore.wait()
+
+        guard let report = reportResult else {
+            print("❌ Failed to generate audit report.")
+            return
+        }
 
         if json {
             let encoder = JSONEncoder()
@@ -64,7 +78,7 @@ struct ScanCommand: AsyncParsableCommand {
             print(" 🏷️  BSSID:             \(net.bssid ?? "Unknown")")
         }
         print(" 🌐 Gateway IP:        \(net.gatewayIP ?? "Unknown") (\(net.gatewayMAC ?? "Unknown"))")
-        print(" 📝 DNS Servers:       \(net.configuredDNS.joined(separator: ", "))")
+        print(" 📝 DNS Servers:       \(net.configuredDNS.isEmpty ? "System Default" : net.configuredDNS.joined(separator: ", "))")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print(" 📊 Security Findings:")
 
@@ -92,21 +106,23 @@ struct ScanCommand: AsyncParsableCommand {
 }
 
 // MARK: - Menu Bar Command (Header Bar)
-struct MenuCommand: AsyncParsableCommand {
+struct MenuCommand: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "menu",
         abstract: "Launch the macOS status bar (menu bar) app for real-time visual monitoring."
     )
 
-    func run() async throws {
-        print("🛡️ Launching NetGuard in macOS Menu Bar...")
+    func run() throws {
+        print("🛡️ NetGuard Menu Bar App is now running in your macOS Top Bar.")
+        print("   Look at the top-right menu bar for the 🛡️ Shield icon.")
+        print("   Press Ctrl+C in this terminal to stop.")
         let controller = MenuBarController()
         controller.start()
     }
 }
 
 // MARK: - Daemon Command
-struct DaemonCommand: AsyncParsableCommand {
+struct DaemonCommand: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "daemon",
         abstract: "Control or run the NetGuard background daemon service.",
@@ -119,37 +135,37 @@ struct DaemonCommand: AsyncParsableCommand {
         defaultSubcommand: DaemonStatus.self
     )
 
-    struct DaemonOn: AsyncParsableCommand {
+    struct DaemonOn: ParsableCommand {
         static var configuration = CommandConfiguration(
             commandName: "on",
             abstract: "Register and start the NetGuard daemon via macOS launchd."
         )
 
-        func run() async throws {
+        func run() throws {
             let result = DaemonManager.enableDaemon()
             print(result.message)
         }
     }
 
-    struct DaemonOff: AsyncParsableCommand {
+    struct DaemonOff: ParsableCommand {
         static var configuration = CommandConfiguration(
             commandName: "off",
             abstract: "Stop and unregister the NetGuard daemon."
         )
 
-        func run() async throws {
+        func run() throws {
             let result = DaemonManager.disableDaemon()
             print(result.message)
         }
     }
 
-    struct DaemonRun: AsyncParsableCommand {
+    struct DaemonRun: ParsableCommand {
         static var configuration = CommandConfiguration(
             commandName: "run",
             abstract: "Execute the daemon event loop (invoked by launchd)."
         )
 
-        func run() async throws {
+        func run() throws {
             let config = ConfigManager.shared.load()
             let scanner = Scanner(config: config)
             let handler = ProtectionHandler(config: config)
@@ -166,26 +182,26 @@ struct DaemonCommand: AsyncParsableCommand {
         }
     }
 
-    struct DaemonStatus: AsyncParsableCommand {
+    struct DaemonStatus: ParsableCommand {
         static var configuration = CommandConfiguration(
             commandName: "status",
             abstract: "Show current daemon service status."
         )
 
-        func run() async throws {
+        func run() throws {
             print(DaemonManager.getStatus())
         }
     }
 }
 
 // MARK: - Watch Command
-struct WatchCommand: AsyncParsableCommand {
+struct WatchCommand: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "watch",
         abstract: "Monitor network transitions in foreground and trigger automatic protection."
     )
 
-    func run() async throws {
+    func run() throws {
         let config = ConfigManager.shared.load()
         let scanner = Scanner(config: config)
         let handler = ProtectionHandler(config: config)
@@ -201,14 +217,13 @@ struct WatchCommand: AsyncParsableCommand {
 
         monitor.start()
 
-        while true {
-            try await Task.sleep(nanoseconds: 1_000_000_000)
-        }
+        // Keep loop running
+        dispatchMain()
     }
 }
 
 // MARK: - Config Command
-struct ConfigCommand: AsyncParsableCommand {
+struct ConfigCommand: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "config",
         abstract: "View or modify NetGuard configuration."
@@ -223,7 +238,7 @@ struct ConfigCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Add a trusted Wi-Fi SSID.")
     var addTrustedSSID: String?
 
-    func run() async throws {
+    func run() throws {
         var config = ConfigManager.shared.load()
 
         if reset {
@@ -262,13 +277,13 @@ struct ConfigCommand: AsyncParsableCommand {
 }
 
 // MARK: - Status Command
-struct StatusCommand: AsyncParsableCommand {
+struct StatusCommand: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "status",
         abstract: "Check active network status and protection settings."
     )
 
-    func run() async throws {
+    func run() throws {
         let config = ConfigManager.shared.load()
         let net = WifiDetector.collectNetworkInfo()
 
