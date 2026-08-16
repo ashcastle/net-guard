@@ -1,8 +1,8 @@
 class NetGuard < Formula
   desc "Automated macOS Network Security & Eavesdropping Prevention Tool"
   homepage "https://github.com/ashcastle/net-guard"
-  url "https://github.com/ashcastle/net-guard/archive/refs/tags/v1.0.1.tar.gz"
-  sha256 "d10724b191323067de5517bec7f6eec0c57fb876cabed294b547ae6b14790df9"
+  url "https://github.com/ashcastle/net-guard/archive/refs/tags/v1.0.2.tar.gz"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license "MIT"
   head "https://github.com/ashcastle/net-guard.git", branch: "main"
 
@@ -12,6 +12,8 @@ class NetGuard < Formula
   def install
     system "swift", "build", "-c", "release", "--disable-sandbox"
     bin.install ".build/release/netguard"
+    bin.install_symlink bin/"netguard" => "net-guard"
+    bin.install_symlink bin/"netguard" => "netg"
   end
 
   service do
@@ -23,5 +25,7 @@ class NetGuard < Formula
 
   test do
     system "#{bin}/netguard", "--version"
+    system "#{bin}/net-guard", "--version"
+    system "#{bin}/netg", "--version"
   end
 end
