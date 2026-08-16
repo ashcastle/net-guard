@@ -22,38 +22,76 @@ public struct NetGuardConfig: Codable {
 }
 
 public struct DetectionSettings: Codable {
-    public var checkWifiSecurity: Bool = true
-    public var checkArpSpoof: Bool = true
-    public var checkDnsHijack: Bool = true
-    public var checkSslMitm: Bool = true
-    public var checkCaptive: Bool = true
-    public var testDomains: [String] = [
-        "google.com",
-        "cloudflare.com",
-        "apple.com",
-        "github.com"
-    ]
-    public var dohServers: [String] = [
-        "https://cloudflare-dns.com/dns-query",
-        "https://dns.google/dns-query"
-    ]
+    public var checkWifiSecurity: Bool
+    public var checkArpSpoof: Bool
+    public var checkDnsHijack: Bool
+    public var checkSslMitm: Bool
+    public var checkCaptive: Bool
+    public var testDomains: [String]
+    public var dohServers: [String]
+
+    public init(
+        checkWifiSecurity: Bool = true,
+        checkArpSpoof: Bool = true,
+        checkDnsHijack: Bool = true,
+        checkSslMitm: Bool = true,
+        checkCaptive: Bool = true,
+        testDomains: [String] = ["google.com", "cloudflare.com", "apple.com", "github.com"],
+        dohServers: [String] = ["https://cloudflare-dns.com/dns-query", "https://dns.google/dns-query"]
+    ) {
+        self.checkWifiSecurity = checkWifiSecurity
+        self.checkArpSpoof = checkArpSpoof
+        self.checkDnsHijack = checkDnsHijack
+        self.checkSslMitm = checkSslMitm
+        self.checkCaptive = checkCaptive
+        self.testDomains = testDomains
+        self.dohServers = dohServers
+    }
 }
 
 public struct ActionSettings: Codable {
-    public var enableNotification: Bool = true
-    public var autoSecureDNS: Bool = false
-    public var secureDNSAddresses: [String] = ["1.1.1.1", "1.0.0.1", "8.8.8.8"]
-    public var autoVpnCommand: String = ""
+    public var enableNotification: Bool
+    public var autoSecureDNS: Bool
+    public var secureDNSAddresses: [String]
+    public var autoVpnCommand: String
+
+    public init(
+        enableNotification: Bool = true,
+        autoSecureDNS: Bool = false,
+        secureDNSAddresses: [String] = ["1.1.1.1", "1.0.0.1", "8.8.8.8"],
+        autoVpnCommand: String = ""
+    ) {
+        self.enableNotification = enableNotification
+        self.autoSecureDNS = autoSecureDNS
+        self.secureDNSAddresses = secureDNSAddresses
+        self.autoVpnCommand = autoVpnCommand
+    }
 }
 
 public struct TrustSettings: Codable {
-    public var trustedSSIDs: [String] = []
-    public var trustedBSSIDs: [String] = []
+    public var trustedSSIDs: [String]
+    public var trustedBSSIDs: [String]
+
+    public init(
+        trustedSSIDs: [String] = [],
+        trustedBSSIDs: [String] = []
+    ) {
+        self.trustedSSIDs = trustedSSIDs
+        self.trustedBSSIDs = trustedBSSIDs
+    }
 }
 
 public struct LoggingSettings: Codable {
-    public var logLevel: String = "info"
-    public var logFile: String = "~/.local/state/netguard/netguard.log"
+    public var logLevel: String
+    public var logFile: String
+
+    public init(
+        logLevel: String = "info",
+        logFile: String = "~/.local/state/netguard/netguard.log"
+    ) {
+        self.logLevel = logLevel
+        self.logFile = logFile
+    }
 }
 
 public final class ConfigManager {

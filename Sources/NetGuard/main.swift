@@ -1,12 +1,11 @@
 import Foundation
 import ArgumentParser
 
-@main
 struct NetGuardCLI: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "netguard",
         abstract: "🛡️ NetGuard: Automated macOS Network Security & Eavesdropping Prevention Tool",
-        version: "1.1.0",
+        version: "1.0.1",
         subcommands: [
             ScanCommand.self,
             MenuCommand.self,
@@ -284,3 +283,6 @@ struct StatusCommand: AsyncParsableCommand {
         print("  • Trusted Networks: \(config.trust.trustedSSIDs.isEmpty ? "None" : config.trust.trustedSSIDs.joined(separator: ", "))\n")
     }
 }
+
+// MARK: - Entry Point
+NetGuardCLI.main()

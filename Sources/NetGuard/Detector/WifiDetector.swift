@@ -110,25 +110,23 @@ public final class WifiDetector {
     }
 
     private static func parseSecurityType(_ sec: CWSecurity) -> String {
-        switch sec {
-        case .none: return "Open (None)"
-        case .wep: return "WEP"
-        case .wpaPersonal: return "WPA Personal"
-        case .wpaPersonalMixed: return "WPA/WPA2 Mixed Personal"
-        case .wpa2Personal: return "WPA2 Personal"
-        case .personal: return "Personal (WPA/WPA2/WPA3)"
-        case .dynamicWEP: return "Dynamic WEP"
-        case .wpaEnterprise: return "WPA Enterprise"
-        case .wpaEnterpriseMixed: return "WPA/WPA2 Enterprise Mixed"
-        case .wpa2Enterprise: return "WPA2 Enterprise"
-        case .enterprise: return "Enterprise"
-        case .wpa3Personal: return "WPA3 Personal (SAE)"
-        case .wpa3Enterprise: return "WPA3 Enterprise"
-        case .wpa3Transition: return "WPA3 Transition"
-        case .OWE: return "Enhanced Open (OWE)"
-        case .OWETransition: return "OWE Transition"
-        case .unknown: return "Unknown"
-        @unknown default: return "Standard Security"
+        switch sec.rawValue {
+        case CWSecurity.none.rawValue: return "Open (None)"
+        case CWSecurity.wpaPersonal.rawValue: return "WPA Personal"
+        case CWSecurity.wpaPersonalMixed.rawValue: return "WPA/WPA2 Mixed Personal"
+        case CWSecurity.wpa2Personal.rawValue: return "WPA2 Personal"
+        case CWSecurity.personal.rawValue: return "Personal (WPA/WPA2/WPA3)"
+        case CWSecurity.dynamicWEP.rawValue: return "Dynamic WEP"
+        case CWSecurity.wpaEnterprise.rawValue: return "WPA Enterprise"
+        case CWSecurity.wpaEnterpriseMixed.rawValue: return "WPA/WPA2 Enterprise Mixed"
+        case CWSecurity.wpa2Enterprise.rawValue: return "WPA2 Enterprise"
+        case CWSecurity.enterprise.rawValue: return "Enterprise"
+        case CWSecurity.wpa3Personal.rawValue: return "WPA3 Personal (SAE)"
+        case CWSecurity.wpa3Enterprise.rawValue: return "WPA3 Enterprise"
+        case CWSecurity.wpa3Transition.rawValue: return "WPA3 Transition"
+        case CWSecurity.unknown.rawValue: return "Unknown"
+        default:
+            return "WPA/WPA2/WPA3 (\(sec.rawValue))"
         }
     }
 
