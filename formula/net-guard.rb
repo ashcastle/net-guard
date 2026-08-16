@@ -1,8 +1,8 @@
 class NetGuard < Formula
   desc "Automated macOS Network Security & Eavesdropping Prevention Tool"
   homepage "https://github.com/ashcastle/net-guard"
-  url "https://github.com/ashcastle/net-guard/archive/refs/tags/v1.0.0.tar.gz"
-  sha256 "eb7a66634b523681baf9f442134f8ca4be810d9531c94eb6341c9313450a815f"
+  url "https://github.com/ashcastle/net-guard/archive/refs/tags/v1.0.1.tar.gz"
+  sha256 "d10724b191323067de5517bec7f6eec0c57fb876cabed294b547ae6b14790df9"
   license "MIT"
   head "https://github.com/ashcastle/net-guard.git", branch: "main"
 
