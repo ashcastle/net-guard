@@ -29,16 +29,26 @@
 
 ### 방법 1: Homebrew Tap으로 설치 (권장)
 
+최신 Homebrew 보안 정책에 따라 서드파티 탭 신뢰(`brew trust`) 단계가 포함됩니다:
+
 ```bash
 # 1. 저장소 Tap 추가
 brew tap ashcastle/net-guard https://github.com/ashcastle/net-guard
 
-# 2. NetGuard 설치
+# 2. Tap 신뢰 등록 (Homebrew 보안 정책)
+brew trust ashcastle/net-guard
+
+# 3. NetGuard 설치
 brew install net-guard
 
 # (선택 사항) 맥 로그인 시 항상 백그라운드에서 자동 실행
 brew services start net-guard
 ```
+
+> **참고**: `Refusing to load formula ... from untrusted tap` 경고가 발생하면 다음 명령어로 특정 포뮬러를 신뢰 등록할 수 있습니다:
+> ```bash
+> brew trust --formula ashcastle/net-guard/net-guard
+> ```
 
 ### 방법 2: Formula URL로 직접 설치
 

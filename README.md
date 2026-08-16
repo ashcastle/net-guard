@@ -33,16 +33,24 @@
 # 1. Tap the repository
 brew tap ashcastle/net-guard https://github.com/ashcastle/net-guard
 
-# 2. Install NetGuard
+# 2. Trust the tap (Required by modern Homebrew security policies)
+brew trust ashcastle/net-guard
+
+# 3. Install NetGuard
 brew install net-guard
 
 # (Optional) Start automatically on macOS login via Homebrew Services
 brew services start net-guard
 ```
 
+> **Note**: If Homebrew prompts an untrusted tap warning, run:
+> ```bash
+> brew trust --formula ashcastle/net-guard/net-guard
+> ```
+
 ### Method 2: Direct Formula Installation
 
-You can also install NetGuard directly using the raw Formula URL without tapping:
+You can also install NetGuard directly using the raw Formula URL:
 
 ```bash
 brew install https://raw.githubusercontent.com/ashcastle/net-guard/main/formula/net-guard.rb
