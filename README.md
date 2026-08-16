@@ -1,5 +1,10 @@
 # 🛡️ NetGuard
 
+<p align="left">
+  <a href="README.md">🌐 <b>English</b></a> |
+  <a href="README-KR.md">🇰🇷 <b>한국어</b></a>
+</p>
+
 **NetGuard** is a lightweight, open-source macOS network security daemon and CLI tool written natively in Swift. It automatically monitors network transitions, audits the security of newly connected Wi-Fi or wired networks, and protects against packet sniffing, Man-in-the-Middle (MITM) attacks, ARP spoofing, and DNS hijacking.
 
 ---
@@ -22,15 +27,7 @@
 
 ## 📦 Installation Guide (Homebrew)
 
-### Method 1: Direct Formula Installation (Recommended)
-
-You can install NetGuard directly using the raw Formula URL:
-
-```bash
-brew install https://raw.githubusercontent.com/ashcastle/net-guard/main/formula/net-guard.rb
-```
-
-### Method 2: Via Homebrew Tap
+### Method 1: Via Homebrew Tap (Recommended)
 
 ```bash
 # 1. Tap the repository
@@ -41,6 +38,14 @@ brew install net-guard
 
 # (Optional) Start automatically on macOS login via Homebrew Services
 brew services start net-guard
+```
+
+### Method 2: Direct Formula Installation
+
+You can also install NetGuard directly using the raw Formula URL without tapping:
+
+```bash
+brew install https://raw.githubusercontent.com/ashcastle/net-guard/main/formula/net-guard.rb
 ```
 
 ### Method 3: Manual Build via Swift Package Manager
