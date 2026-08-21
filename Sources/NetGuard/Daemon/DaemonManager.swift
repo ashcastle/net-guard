@@ -18,6 +18,10 @@ public final class DaemonManager {
         return home.appendingPathComponent(".local/state/netguard/daemon.err.log")
     }
 
+    private static var currentUID: String {
+        return String(getuid())
+    }
+
     public static func enableDaemon() -> (success: Bool, message: String) {
         // Find executable binary path
         let binaryPath = ProcessInfo.processInfo.arguments.first ?? "/usr/local/bin/netguard"
@@ -39,7 +43,7 @@ public final class DaemonManager {
         let launchAgentsDir = plistURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: launchAgentsDir, withIntermediateDirectories: true, attributes: nil)
 
-        // Generate plist XML
+        // Generate plist XML (KeepAlive only on abnormal crash, not on normal exit)
         let plistContent = """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -56,7 +60,10 @@ public final class DaemonManager {
             <key>RunAtLoad</key>
             <true/>
             <key>KeepAlive</key>
-            <true/>
+            <dict>
+                <key>SuccessfulExit</key>
+                <false/>
+            </dict>
             <key>StandardOutPath</key>
             <string>\(logURL.path)</string>
             <key>StandardErrorPath</key>
@@ -71,22 +78,41 @@ public final class DaemonManager {
             return (false, "Failed to write plist file to \(plistURL.path): \(error.localizedDescription)")
         }
 
-        // Unload existing service if loaded, then load new plist
+        // Bootout / Unload any existing service first
+        _ = WifiDetector.runProcess(executable: "/bin/launchctl", arguments: ["bootout", "gui/\(currentUID)/\(label)"])
         _ = WifiDetector.runProcess(executable: "/bin/launchctl", arguments: ["unload", plistURL.path])
-        let loadOutput = WifiDetector.runProcess(executable: "/bin/launchctl", arguments: ["load", "-w", plistURL.path])
+
+        // Load new service
+        let bootstrapOutput = WifiDetector.runProcess(executable: "/bin/launchctl", arguments: ["bootstrap", "gui/\(currentUID)", plistURL.path])
+        if !isRunning() {
+            _ = WifiDetector.runProcess(executable: "/bin/launchctl", arguments: ["load", "-w", plistURL.path])
+        }
 
         if isRunning() {
             return (true, "✅ NetGuard daemon successfully enabled and started! (LaunchAgent: \(plistURL.path))")
         } else {
-            return (true, "✅ NetGuard daemon registered. Output: \(loadOutput)")
+            return (true, "✅ NetGuard daemon registered. Output: \(bootstrapOutput)")
         }
     }
 
     public static func disableDaemon() -> (success: Bool, message: String) {
+        var actionsPerformed = false
+
+        // 1. Bootout service domain in launchctl
+        _ = WifiDetector.runProcess(executable: "/bin/launchctl", arguments: ["bootout", "gui/\(currentUID)/\(label)"])
+        
+        // 2. Unload plist if exists
         if FileManager.default.fileExists(atPath: plistURL.path) {
             _ = WifiDetector.runProcess(executable: "/bin/launchctl", arguments: ["unload", "-w", plistURL.path])
             try? FileManager.default.removeItem(at: plistURL)
-            return (true, "🛑 NetGuard daemon disabled and stopped.")
+            actionsPerformed = true
+        }
+
+        // 3. Terminate any remaining netguard daemon processes
+        _ = WifiDetector.runProcess(executable: "/usr/bin/pkill", arguments: ["-f", "netguard daemon run"])
+
+        if actionsPerformed || !isRunning() {
+            return (true, "🛑 NetGuard daemon and all associated processes stopped.")
         } else {
             return (true, "NetGuard daemon is already disabled.")
         }

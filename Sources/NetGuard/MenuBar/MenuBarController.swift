@@ -214,6 +214,7 @@ public final class MenuBarController: NSObject, NSApplicationDelegate, NSMenuDel
     }
 
     @objc private func quitClicked() {
+        _ = DaemonManager.disableDaemon()
         NSApplication.shared.terminate(nil)
     }
 }
